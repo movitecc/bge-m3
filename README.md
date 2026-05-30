@@ -25,6 +25,7 @@ bge-m3/
 ├── onnx/                          # ONNX 推理配置
 │   ├── config.json
 │   ├── model.onnx                 # ONNX 模型结构（708KB）
+│   ├── model_quantized.onnx       # INT8 量化 ONNX 权重（544MB，Release）
 │   ├── tokenizer.json
 │   ├── tokenizer_config.json
 │   └── special_tokens_map.json
@@ -55,6 +56,36 @@ chmod +x download_and_merge.sh
 - `pytorch_model.bin` — PyTorch 权重（2.2GB）
 - `onnx/model.onnx_data` — ONNX 权重（2.2GB）
 - `onnx/Constant_7_attr__value` — ONNX 常量
+
+### INT8 量化版本（推荐低资源部署）
+
+从 Release 下载 INT8 量化 ONNX 模型，内存占用降低约 75%：
+
+```bash
+wget https://github.com/movitecc/bge-m3/releases/latest/download/model_quantized.onnx -O ./bge-m3/onnx/model_quantized.onnx
+```
+
+配合 onnxruntime 使用：
+
+```python
+import onnxruntime as ort
+import numpy as np
+from transformers import AutoTokenizer
+
+tokenizer = AutoTokenizer.from_pretrained("./bge-m3/")
+session = ort.InferenceSession("./bge-m3/onnx/model_quantized.onnx")
+
+inputs = tokenizer(["Hello, world!", "你好，世界！"],
+                   padding=True, truncation=True, return_tensors="np")
+outputs = session.run(None, {
+    "input_ids": inputs["input_ids"],
+    "attention_mask": inputs["attention_mask"],
+})
+embeddings = outputs[0]  # shape: (batch, seq_len, 1024)
+print(embeddings.shape)
+```
+
+> 量化来源：[Xenova/bge-m3](https://huggingface.co/Xenova/bge-m3) — 基于 ONNX Runtime 的 INT8 量化。推理速度更快、内存更低，精度损失极小。
 
 ### Python 加载示例
 
